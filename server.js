@@ -9,7 +9,7 @@ app.use(express.json());
 
 // --- CẤU HÌNH MONGODB ---
 // Thay chuỗi kết nối của bạn vào đây
-const MONGO_URI = "mongodb+srv://<USER>:<PASS>@cluster....mongodb.net/SmartHomeDB";
+const MONGO_URI = "mongodb+srv://IOT:123@clusteriot.5bryo7q.mongodb.net/?appName=ClusterIOT";
 
 mongoose.connect(MONGO_URI)
     .then(() => console.log("✅ Đã kết nối MongoDB"))
