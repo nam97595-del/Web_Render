@@ -1,0 +1,4 @@
+# Thư mục chứa các gói thư viện
+node_modules/
+# File lock chứa cấu trúc phụ thuộc
+package-lock.json
