@@ -221,12 +221,41 @@ app.post('/api/data', authMiddleware(['admin']), async (req, res) => {
 
 // API Lấy lịch sử (/api/history)
 // ⚠️ PHÂN QUYỀN: Chỉ cho phép tài khoản 'admin' và 'user' (tức là mọi người dùng đã đăng nhập)
+// server.js - Thay thế API lấy lịch sử cũ bằng đoạn này
 app.get('/api/history', authMiddleware(['admin', 'user']), async (req, res) => {
     try {
-        // Sau khi kiểm tra, bạn có thể biết user nào đang gọi API qua req.user
-        // console.log(`User ${req.user.role} dang truy cap lich su`); 
-        const logs = await LogModel.find().sort({ timestamp: -1 }).limit(20);
+        // Lấy tham số từ URL (ví dụ: ?startDate=2023-12-01&endDate=2023-12-02)
+        const { startDate, endDate, filterType } = req.query;
+
+        let query = {};
+
+        // 1. Xử lý lọc theo thời gian
+        if (startDate || endDate) {
+            query.timestamp = {};
+            if (startDate) {
+                // Từ đầu ngày của ngày bắt đầu
+                query.timestamp.$gte = new Date(startDate);
+            }
+            if (endDate) {
+                // Đến cuối ngày của ngày kết thúc (cộng thêm 1 ngày để bao trọn ngày đó)
+                const end = new Date(endDate);
+                end.setDate(end.getDate() + 1);
+                query.timestamp.$lt = end;
+            }
+        }
+
+        // 2. Xử lý lọc theo loại cảnh báo (Ví dụ: chỉ tìm lúc có người)
+        if (filterType === 'alarm') {
+            query.pir = 1;
+        }
+
+        // Thực hiện truy vấn
+        // Nếu có tìm kiếm thì lấy nhiều hơn (100 dòng), không thì lấy 20 dòng mặc định
+        const limit = (startDate || endDate || filterType) ? 100 : 20;
+
+        const logs = await LogModel.find(query).sort({ timestamp: -1 }).limit(limit);
         res.json(logs);
+
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
