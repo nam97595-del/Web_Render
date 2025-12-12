@@ -16,6 +16,7 @@ const app = express();
 // ⚠️ THAY THẾ bằng URL Hosting CHÍNH XÁC của bạn
 const allowedOrigins = [
     'https://project-1-33e9f.web.app', // Domain Firebase Hosting CỦA BẠN
+    'https://project-1-33e9f.firebaseapp.com',
     'http://localhost:3000',
     'http://localhost:5000'
 ];
