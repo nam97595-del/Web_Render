@@ -4,16 +4,17 @@ const cors = require('cors');
 const mqtt = require('mqtt');
 
 const app = express();
-app.use(cors());
+
+// --- QUAN TRỌNG: Cấu hình CORS cho phép mọi nguồn truy cập ---
+app.use(cors({ origin: '*' }));
 app.use(express.json());
 
-// --- 1. CẤU HÌNH MONGODB ---
+// --- 1. KẾT NỐI MONGODB ---
 const MONGO_URI = "mongodb+srv://IOT:123@clusteriot.5bryo7q.mongodb.net/?appName=ClusterIOT";
 mongoose.connect(MONGO_URI)
     .then(() => console.log("✅ Đã kết nối MongoDB"))
     .catch(err => console.error("❌ Lỗi MongoDB:", err));
 
-// Schema dữ liệu
 const LogSchema = new mongoose.Schema({
     temp: Number,
     humi: Number,
@@ -23,80 +24,64 @@ const LogSchema = new mongoose.Schema({
 });
 const LogModel = mongoose.model('Log', LogSchema);
 
-// --- 2. CẤU HÌNH MQTT (HiveMQ Cloud - SSL/TLS) ---
-// Lưu ý: Phải có 'mqtts://' ở đầu vì dùng port 8883
+// --- 2. KẾT NỐI MQTT (HiveMQ Cloud SSL) ---
 const MQTT_BROKER = "mqtts://e92f64d335bb4671b8a0ec4a667e3438.s1.eu.hivemq.cloud";
-
 const MQTT_OPTIONS = {
     port: 8883,
-    username: 'MQTT_IOT',  // User bạn cung cấp
-    password: 'Iot@12345', // Pass bạn cung cấp
+    username: 'MQTT_IOT',
+    password: 'Iot@12345',
     protocol: 'mqtts',
-    rejectUnauthorized: false // Chấp nhận kết nối dễ dàng hơn
+    rejectUnauthorized: false
 };
-
-// Topic (Giữ nguyên như cũ để khớp với ESP8266)
 const MQTT_TOPIC = "sinhvien/iot/nha_thong_minh/data";
 
 const mqttClient = mqtt.connect(MQTT_BROKER, MQTT_OPTIONS);
 
 mqttClient.on('connect', () => {
-    console.log("✅ Đã kết nối tới HiveMQ Cloud (Private)!");
-    mqttClient.subscribe(MQTT_TOPIC, (err) => {
-        if (!err) {
-            console.log(`📡 Đang lắng nghe tại topic: ${MQTT_TOPIC}`);
-        }
-    });
+    console.log("✅ Đã kết nối HiveMQ Cloud!");
+    mqttClient.subscribe(MQTT_TOPIC);
 });
 
-mqttClient.on('error', (err) => {
-    console.error("❌ Lỗi kết nối MQTT:", err);
-});
-
-// Xử lý tin nhắn nhận về
 mqttClient.on('message', async (topic, message) => {
-    if (topic === MQTT_TOPIC) {
-        try {
-            const dataStr = message.toString();
-            console.log("📩 Nhận MQTT:", dataStr);
-            const data = JSON.parse(dataStr);
-
-            const newLog = new LogModel(data);
-            await newLog.save();
-            console.log("💾 Đã lưu DB!");
-        } catch (err) {
-            console.error("❌ Lỗi data:", err.message);
-        }
-    }
+    try {
+        const data = JSON.parse(message.toString());
+        console.log("📩 Nhận MQTT:", data);
+        const newLog = new LogModel(data);
+        await newLog.save();
+    } catch (e) { console.error(e); }
 });
 
-// --- API WEB ---
+// --- 3. API ĐĂNG NHẬP (MỚI THÊM) ---
+app.post('/api/login', (req, res) => {
+    const { username, password } = req.body;
+
+    // Code cứng tài khoản để demo (Bạn có thể sửa lại)
+    if (username === 'admin' && password === '123456') {
+        return res.json({ token: 'fake-jwt-token-admin', role: 'admin' });
+    }
+    if (username === 'user' && password === '123456') {
+        return res.json({ token: 'fake-jwt-token-user', role: 'user' });
+    }
+
+    res.status(401).json({ error: "Sai tài khoản hoặc mật khẩu!" });
+});
+
+// --- 4. API DỮ LIỆU ---
+app.get('/api/history', async (req, res) => {
+    try {
+        const logs = await LogModel.find().sort({ timestamp: -1 }).limit(20);
+        res.json(logs);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// API nhận data từ Simulator (Web)
 app.post('/api/data', async (req, res) => {
     try {
         const newLog = new LogModel(req.body);
         await newLog.save();
         res.json({ status: "success" });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-app.get('/api/history', async (req, res) => {
-    try {
-        // Lấy lịch sử, có thể lọc theo ngày nếu cần
-        let query = {};
-        if (req.query.startDate && req.query.endDate) {
-            query.timestamp = {
-                $gte: new Date(req.query.startDate),
-                $lte: new Date(req.query.endDate)
-            };
-        }
-        const logs = await LogModel.find(query).sort({ timestamp: -1 }).limit(50);
-        res.json(logs);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server chạy port ${PORT}`));
+app.listen(PORT, () => console.log(`Server chạy tại port ${PORT}`));
