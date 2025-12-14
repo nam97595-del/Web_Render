@@ -57,15 +57,24 @@ const mqttClient = mqtt.connect(MQTT_BROKER, MQTT_OPTIONS);
 
 mqttClient.on('connect', () => {
     console.log("✅ Đã kết nối HiveMQ Cloud!");
-    mqttClient.subscribe(MQTT_TOPIC);
+
+    // Thêm hàm báo lỗi chi tiết
+    mqttClient.subscribe(MQTT_TOPIC, (err) => {
+        if (!err) {
+            console.log(`📡 Đã đăng ký nhận tin tại topic: ${MQTT_TOPIC}`);
+        } else {
+            console.error("❌ Lỗi Subscribe (Không thể nhận tin):", err);
+        }
+    });
 });
 
 mqttClient.on('message', async (topic, message) => {
     try {
         const data = JSON.parse(message.toString());
-        // console.log("📩 Nhận MQTT:", data); // Tắt bớt log đỡ rối
+        console.log("📩 Nhận MQTT:", data); // Tắt bớt log đỡ rối
         const newLog = new LogModel(data);
         await newLog.save();
+        console.log("💾 Đã lưu vào DB!");
     } catch (e) { console.error(e); }
 });
 
