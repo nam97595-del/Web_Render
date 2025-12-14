@@ -46,7 +46,7 @@ const UserModel = mongoose.model('users', UserSchema);
 const MQTT_BROKER = "mqtts://e92f64d335bb4671b8a0ec4a667e3438.s1.eu.hivemq.cloud";
 const MQTT_OPTIONS = {
     port: 8883,
-    username: 'MQTT_IOT2',
+    username: 'MQTT_IOT',
     password: 'Iot@12345',
     protocol: 'mqtts',
     rejectUnauthorized: false
