@@ -23,18 +23,20 @@ mongoose.connect(MONGO_URI)
 
 // --- SCHEMA DỮ LIỆU ---
 
-// 1. Schema cho Log cảm biến (Giữ nguyên)
+// 1. Schema cho Log cảm biến
 const LogSchema = new mongoose.Schema({
+    deviceId: { type: String, required: true }, // room_1, room_2
     temp: Number,
     humi: Number,
     ldr: Number,
     pir: Number,
     timestamp: { type: Date, default: Date.now }
-});
-const LogModel = mongoose.model('Log', LogSchema); // Tự động tìm collection 'logs'
+}, { collection: 'logs_2_phong' }); // <--- Ghi vào collection này
+// Model này sẽ tự động tương tác với 'logs_2_phong' trong database 'test'
+const LogModel = mongoose.model('LogNew', LogSchema);
 
-// 2. Schema cho User (MỚI: Để đăng nhập)
-// Collection trong ảnh của bạn tên là 'users'
+// 2. Schema cho User (Để đăng nhập)
+// Collection 'users'
 const UserSchema = new mongoose.Schema({
     username: { type: String, required: true },
     password: { type: String, required: true },
@@ -113,10 +115,19 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
-// --- API Lịch sử ---
+// --- API Lịch sử (Thêm lọc theo phòng)---
 app.get('/api/history', async (req, res) => {
     try {
-        const logs = await LogModel.find().sort({ timestamp: -1 }).limit(20);
+        // Nhận tham số ?deviceId=room_1 từ Web gửi lên
+        const { deviceId } = req.query;
+
+        let query = {};
+        // Nếu Web có gửi deviceId thì lọc, nếu không thì lấy hết (đề phòng)
+        if (deviceId) {
+            query.deviceId = deviceId;
+        }
+
+        const logs = await LogModel.find(query).sort({ timestamp: -1 }).limit(20);
         res.json(logs);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -134,30 +145,32 @@ const PORT = process.env.PORT || 3000;
 // API TÌM KIẾM DỮ LIỆU (Search)
 app.get('/api/search', async (req, res) => {
     try {
-        const { start, end } = req.query;
+        // Thêm nhận deviceId
+        const { start, end, deviceId } = req.query;
 
         if (!start || !end) {
             return res.status(400).json({ error: "Vui lòng chọn ngày bắt đầu và kết thúc" });
         }
 
-        // Xử lý ngày giờ: 
-        // Start: Bắt đầu từ 00:00:00 của ngày đó
-        // End: Kết thúc lúc 23:59:59 của ngày đó
-        const startDate = new Date(start);
-        startDate.setHours(0, 0, 0, 0);
+        const startDate = new Date(start); startDate.setHours(0, 0, 0, 0);
+        const endDate = new Date(end); endDate.setHours(23, 59, 59, 999);
 
-        const endDate = new Date(end);
-        endDate.setHours(23, 59, 59, 999);
-
-        console.log(`🔍 Search: ${startDate.toISOString()} -> ${endDate.toISOString()}`);
-
-        const logs = await LogModel.find({
+        // Tạo điều kiện tìm kiếm
+        let query = {
             timestamp: {
-                $gte: startDate, // Lớn hơn hoặc bằng ngày bắt đầu
-                $lte: endDate    // Nhỏ hơn hoặc bằng ngày kết thúc
+                $gte: startDate,
+                $lte: endDate
             }
-        }).sort({ timestamp: -1 }); // Mới nhất lên đầu
+        };
 
+        // Nếu có chọn phòng, thêm điều kiện lọc phòng
+        if (deviceId) {
+            query.deviceId = deviceId;
+        }
+
+        console.log(`🔍 Search [${deviceId || 'All'}]: ${startDate.toISOString()} -> ${endDate.toISOString()}`);
+
+        const logs = await LogModel.find(query).sort({ timestamp: -1 });
         res.json(logs);
 
     } catch (err) {
