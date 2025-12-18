@@ -131,4 +131,38 @@ app.post('/api/data', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
+// API TÌM KIẾM DỮ LIỆU (Search)
+app.get('/api/search', async (req, res) => {
+    try {
+        const { start, end } = req.query;
+
+        if (!start || !end) {
+            return res.status(400).json({ error: "Vui lòng chọn ngày bắt đầu và kết thúc" });
+        }
+
+        // Xử lý ngày giờ: 
+        // Start: Bắt đầu từ 00:00:00 của ngày đó
+        // End: Kết thúc lúc 23:59:59 của ngày đó
+        const startDate = new Date(start);
+        startDate.setHours(0, 0, 0, 0);
+
+        const endDate = new Date(end);
+        endDate.setHours(23, 59, 59, 999);
+
+        console.log(`🔍 Search: ${startDate.toISOString()} -> ${endDate.toISOString()}`);
+
+        const logs = await LogModel.find({
+            timestamp: {
+                $gte: startDate, // Lớn hơn hoặc bằng ngày bắt đầu
+                $lte: endDate    // Nhỏ hơn hoặc bằng ngày kết thúc
+            }
+        }).sort({ timestamp: -1 }); // Mới nhất lên đầu
+
+        res.json(logs);
+
+    } catch (err) {
+        console.error("Lỗi tìm kiếm:", err);
+        res.status(500).json({ error: "Lỗi Server khi tìm kiếm" });
+    }
+});
 app.listen(PORT, () => console.log(`Server chạy tại port ${PORT}`));
