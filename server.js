@@ -165,4 +165,25 @@ app.get('/api/search', async (req, res) => {
         res.status(500).json({ error: "Lỗi Server khi tìm kiếm" });
     }
 });
+
+// API XÓA DỮ LIỆU (Nhận vào mảng các ID)
+app.post('/api/delete', async (req, res) => {
+    try {
+        const { ids } = req.body; // Ví dụ client gửi: { "ids": ["id1", "id2"] }
+
+        if (!ids || !Array.isArray(ids) || ids.length === 0) {
+            return res.status(400).json({ error: "Chưa chọn dữ liệu để xóa" });
+        }
+
+        // Lệnh deleteMany của MongoDB với toán tử $in (nằm trong danh sách)
+        const result = await LogModel.deleteMany({ _id: { $in: ids } });
+
+        console.log(`🗑️ Đã xóa ${result.deletedCount} bản ghi.`);
+        res.json({ status: "success", deletedCount: result.deletedCount });
+
+    } catch (err) {
+        console.error("Lỗi xóa:", err);
+        res.status(500).json({ error: "Lỗi Server khi xóa" });
+    }
+});
 app.listen(PORT, () => console.log(`Server chạy tại port ${PORT}`));
